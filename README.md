@@ -2,7 +2,7 @@
 
 This experiment detects arrival-time skew between participants in a collective operation. It uses BMv2 switches and reports detections in the switch log.
 
-## Topology of the network
+## Topology
 
 The checked-in `topology.json` defines four hosts and four P4 switches. All links have bandwidth 100; the h3-to-s2 link has 20 ms delay and the other links have zero configured delay.
 
