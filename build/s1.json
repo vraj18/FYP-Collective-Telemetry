@@ -10,9 +10,10 @@
         ["tmp_2", 16, false],
         ["tmp_3", 8, false],
         ["tmp_4", 8, false],
-        ["tmp_5", 48, false],
-        ["tmp_6", 8, false],
+        ["tmp_5", 8, false],
+        ["tmp_6", 48, false],
         ["tmp_7", 8, false],
+        ["tmp_8", 8, false],
         ["index_0", 32, false],
         ["old_min_0", 48, false],
         ["old_max_0", 48, false],
@@ -88,9 +89,10 @@
       "name" : "collective_t",
       "id" : 5,
       "fields" : [
-        ["context_id", 16, false],
+        ["collective_id", 16, false],
         ["flow_id", 8, false],
         ["participant_id", 8, false],
+        ["total_flow_count", 8, false],
         ["flags", 8, false]
       ]
     }
@@ -273,7 +275,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 309,
+        "line" : 313,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
@@ -289,7 +291,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 104,
+        "line" : 107,
         "column" : 25,
         "source_fragment" : "min_timestamp_reg"
       },
@@ -301,7 +303,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 105,
+        "line" : 108,
         "column" : 25,
         "source_fragment" : "max_timestamp_reg"
       },
@@ -313,7 +315,7 @@
       "id" : 2,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 106,
+        "line" : 109,
         "column" : 24,
         "source_fragment" : "min_participant_reg"
       },
@@ -325,7 +327,7 @@
       "id" : 3,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 107,
+        "line" : 110,
         "column" : 24,
         "source_fragment" : "max_participant_reg"
       },
@@ -367,7 +369,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 155,
+            "line" : 158,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -398,7 +400,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 159,
+            "line" : 162,
             "column" : 8,
             "source_fragment" : "standard_metadata.egress_spec = port"
           }
@@ -419,14 +421,14 @@
             },
             {
               "type" : "field",
-              "value" : ["collective", "context_id"]
+              "value" : ["collective", "collective_id"]
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 225,
+            "line" : 228,
             "column" : 12,
-            "source_fragment" : "hdr.collective.context_id"
+            "source_fragment" : "hdr.collective.collective_id"
           }
         },
         {
@@ -443,7 +445,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 226,
+            "line" : 229,
             "column" : 12,
             "source_fragment" : "hdr.collective.flow_id"
           }
@@ -470,7 +472,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 224,
+            "line" : 227,
             "column" : 8,
             "source_fragment" : "hash(index, HashAlgorithm.crc16, (bit<32>) 0, { ..."
           }
@@ -493,7 +495,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 230,
+            "line" : 233,
             "column" : 8,
             "source_fragment" : "min_timestamp_reg.read(old_min, index)"
           }
@@ -516,7 +518,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 231,
+            "line" : 234,
             "column" : 8,
             "source_fragment" : "max_timestamp_reg.read(old_max, index)"
           }
@@ -539,7 +541,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 232,
+            "line" : 235,
             "column" : 8,
             "source_fragment" : "min_participant_reg.read(old_min_participant, index)"
           }
@@ -562,7 +564,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 233,
+            "line" : 236,
             "column" : 8,
             "source_fragment" : "max_participant_reg.read(old_max_participant, index)"
           }
@@ -571,7 +573,7 @@
           "op" : "_jump_if_zero",
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 240,
+            "line" : 243,
             "column" : 8,
             "source_fragment" : "if"
           },
@@ -620,7 +622,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 241,
+            "line" : 244,
             "column" : 12,
             "source_fragment" : "old_min = now"
           }
@@ -639,7 +641,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 242,
+            "line" : 245,
             "column" : 12,
             "source_fragment" : "old_max = now"
           }
@@ -658,7 +660,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 243,
+            "line" : 246,
             "column" : 12,
             "source_fragment" : "old_min_participant = 1"
           }
@@ -677,7 +679,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 244,
+            "line" : 247,
             "column" : 12,
             "source_fragment" : "old_max_participant = 1"
           }
@@ -686,14 +688,14 @@
           "op" : "_jump",
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 240,
+            "line" : 243,
             "column" : 8,
             "source_fragment" : "if"
           },
           "parameters" : [
             {
               "type" : "hexstr",
-              "value" : "0x1c"
+              "value" : "0x1d"
             }
           ]
         },
@@ -701,7 +703,7 @@
           "op" : "_jump_if_zero",
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 247,
+            "line" : 250,
             "column" : 12,
             "source_fragment" : "if"
           },
@@ -750,7 +752,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 248,
+            "line" : 251,
             "column" : 16,
             "source_fragment" : "old_min = now"
           }
@@ -769,7 +771,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 249,
+            "line" : 252,
             "column" : 16,
             "source_fragment" : "old_min_participant = hdr.collective.participant_id"
           }
@@ -778,7 +780,7 @@
           "op" : "_jump_if_zero",
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 252,
+            "line" : 255,
             "column" : 12,
             "source_fragment" : "if"
           },
@@ -827,7 +829,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 253,
+            "line" : 256,
             "column" : 16,
             "source_fragment" : "old_max = now"
           }
@@ -846,7 +848,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 254,
+            "line" : 257,
             "column" : 16,
             "source_fragment" : "old_max_participant = hdr.collective.participant_id"
           }
@@ -855,7 +857,7 @@
           "op" : "_jump_if_zero",
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 259,
+            "line" : 262,
             "column" : 12,
             "source_fragment" : "if"
           },
@@ -906,7 +908,7 @@
             },
             {
               "type" : "hexstr",
-              "value" : "0x1c"
+              "value" : "0x1d"
             }
           ]
         },
@@ -924,7 +926,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 38,
+            "line" : 39,
             "column" : 31,
             "source_fragment" : "1"
           }
@@ -938,14 +940,14 @@
             },
             {
               "type" : "field",
-              "value" : ["collective", "context_id"]
+              "value" : ["collective", "collective_id"]
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 264,
+            "line" : 267,
             "column" : 24,
-            "source_fragment" : "hdr.collective.context_id"
+            "source_fragment" : "hdr.collective.collective_id"
           }
         },
         {
@@ -962,7 +964,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 265,
+            "line" : 268,
             "column" : 24,
             "source_fragment" : "hdr.collective.flow_id"
           }
@@ -976,12 +978,31 @@
             },
             {
               "type" : "field",
+              "value" : ["collective", "total_flow_count"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "straggler.p4",
+            "line" : 269,
+            "column" : 24,
+            "source_fragment" : "hdr.collective.total_flow_count"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_5"]
+            },
+            {
+              "type" : "field",
               "value" : ["collective", "participant_id"]
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 266,
+            "line" : 270,
             "column" : 24,
             "source_fragment" : "hdr.collective.participant_id"
           }
@@ -991,7 +1012,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "tmp_5"]
+              "value" : ["scalars", "tmp_6"]
             },
             {
               "type" : "expression",
@@ -1023,28 +1044,9 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 267,
+            "line" : 271,
             "column" : 24,
             "source_fragment" : "skew"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp_6"]
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_participant_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 268,
-            "column" : 24,
-            "source_fragment" : "old_min_participant"
           }
         },
         {
@@ -1056,12 +1058,31 @@
             },
             {
               "type" : "field",
+              "value" : ["scalars", "old_min_participant_0"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "straggler.p4",
+            "line" : 272,
+            "column" : 24,
+            "source_fragment" : "old_min_participant"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_8"]
+            },
+            {
+              "type" : "field",
               "value" : ["scalars", "old_max_participant_0"]
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 269,
+            "line" : 273,
             "column" : 24,
             "source_fragment" : "old_max_participant"
           }
@@ -1071,7 +1092,7 @@
           "parameters" : [
             {
               "type" : "string",
-              "value" : "STRAGGLER switch={} context={} flow={} participant={} skew_us={} min_participant={} max_participant={}"
+              "value" : "COLLECTIVE_STRAGGLER switch={} collective_id={} flow={} total_flows={} impact=COLLECTIVE_DEGRADED participant={} skew_us={} min_participant={} max_participant={}"
             },
             {
               "type" : "parameters_vector",
@@ -1103,13 +1124,17 @@
                 {
                   "type" : "field",
                   "value" : ["scalars", "tmp_7"]
+                },
+                {
+                  "type" : "field",
+                  "value" : ["scalars", "tmp_8"]
                 }
               ]
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 260,
+            "line" : 263,
             "column" : 16,
             "source_fragment" : "log_msg( ..."
           }
@@ -1132,7 +1157,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 275,
+            "line" : 279,
             "column" : 8,
             "source_fragment" : "min_timestamp_reg.write(index, old_min)"
           }
@@ -1155,7 +1180,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 276,
+            "line" : 280,
             "column" : 8,
             "source_fragment" : "max_timestamp_reg.write(index, old_max)"
           }
@@ -1178,7 +1203,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 277,
+            "line" : 281,
             "column" : 8,
             "source_fragment" : "min_participant_reg.write(index, old_min_participant)"
           }
@@ -1201,7 +1226,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 278,
+            "line" : 282,
             "column" : 8,
             "source_fragment" : "max_participant_reg.write(index, old_max_participant)"
           }
@@ -1215,7 +1240,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 149,
+        "line" : 152,
         "column" : 8,
         "source_fragment" : "MyIngress"
       },
@@ -1226,7 +1251,7 @@
           "id" : 0,
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 168,
+            "line" : 171,
             "column" : 10,
             "source_fragment" : "ipv4_forward"
           },
@@ -1261,7 +1286,7 @@
             {
               "source_info" : {
                 "filename" : "straggler.p4",
-                "line" : 181,
+                "line" : 184,
                 "column" : 12,
                 "source_fragment" : "0x0a000101 : forward(1)"
               },
@@ -1280,7 +1305,7 @@
             {
               "source_info" : {
                 "filename" : "straggler.p4",
-                "line" : 182,
+                "line" : 185,
                 "column" : 12,
                 "source_fragment" : "0x0a000202 : forward(2)"
               },
@@ -1299,7 +1324,7 @@
             {
               "source_info" : {
                 "filename" : "straggler.p4",
-                "line" : 183,
+                "line" : 186,
                 "column" : 12,
                 "source_fragment" : "0x0a000303 : forward(3)"
               },
@@ -1318,7 +1343,7 @@
             {
               "source_info" : {
                 "filename" : "straggler.p4",
-                "line" : 184,
+                "line" : 187,
                 "column" : 12,
                 "source_fragment" : "0x0a000404 : forward(4)"
               },
@@ -1341,7 +1366,7 @@
           "id" : 1,
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 285,
+            "line" : 289,
             "column" : 12,
             "source_fragment" : "detect_straggler()"
           },
@@ -1373,7 +1398,7 @@
           "id" : 0,
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 284,
+            "line" : 288,
             "column" : 12,
             "source_fragment" : "hdr.collective.isValid()"
           },
@@ -1398,7 +1423,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 290,
+        "line" : 294,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },

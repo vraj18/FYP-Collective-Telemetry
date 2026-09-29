@@ -13,15 +13,16 @@
  *
  * h1, h2, h3 are collective participants.
  * h4 is the receiver. Each switch has its own compiled forwarding
- * configuration and tracks each context/flow pair independently.
+ * configuration and tracks each collective/flow pair independently.
  *
  * Each collective packet carries:
- *   context_id      : identifies one collective operation
- *   flow_id         : separates concurrent flows within a context
+ *   collective_id   : identifies one collective operation
+ *   flow_id         : separates constituent flows within a collective
+ *   total_flow_count: declared number of flows in the collective
  *   participant_id  : identifies the worker
  *
  * The switch stores the minimum and maximum ingress timestamps
- * for each context_id/flow_id pair. If max_timestamp - min_timestamp exceeds
+ * for each collective_id/flow_id pair. If max_timestamp - min_timestamp exceeds
  * STRAGGLER_THRESHOLD_US, the latest participant is reported as
  * a straggler in the BMv2 switch log.
  */
@@ -66,18 +67,20 @@ header udp_t {
 }
 
 /*
- * 4-byte collective context shim at the beginning of UDP payload.
+ * 6-byte collective context shim at the beginning of UDP payload.
  *
  * Bytes:
- *   0..1 : context_id
+ *   0..1 : collective_id
  *   2    : flow_id
  *   3    : participant_id
- *   4    : flags
+ *   4    : total_flow_count
+ *   5    : flags
  */
 header collective_t {
-    bit<16> context_id;
+    bit<16> collective_id;
     bit<8>  flow_id;
     bit<8>  participant_id;
+    bit<8>  total_flow_count;
     bit<8>  flags;
 }
 
@@ -96,7 +99,7 @@ struct metadata_t {
 }
 
 /*
- * One register entry per 16-bit CRC hash of context_id and flow_id.
+ * One register entry per 16-bit CRC hash of collective_id and flow_id.
  *
  * BMv2 registers store one scalar value per entry, so the state is
  * split across several registers rather than one struct register.
@@ -222,7 +225,7 @@ control MyIngress(
         bit<48> skew;
 
         hash(index, HashAlgorithm.crc16, (bit<32>) 0, {
-            hdr.collective.context_id,
+            hdr.collective.collective_id,
             hdr.collective.flow_id
         }, (bit<32>) 65536);
         now = standard_metadata.ingress_global_timestamp;
@@ -258,11 +261,12 @@ control MyIngress(
 
             if (skew > STRAGGLER_THRESHOLD_US) {
                 log_msg(
-                    "STRAGGLER switch={} context={} flow={} participant={} skew_us={} min_participant={} max_participant={}",
+                    "COLLECTIVE_STRAGGLER switch={} collective_id={} flow={} total_flows={} impact=COLLECTIVE_DEGRADED participant={} skew_us={} min_participant={} max_participant={}",
                     {
                         LOCAL_SWITCH_ID,
-                        hdr.collective.context_id,
+                        hdr.collective.collective_id,
                         hdr.collective.flow_id,
+                        hdr.collective.total_flow_count,
                         hdr.collective.participant_id,
                         skew,
                         old_min_participant,

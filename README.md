@@ -23,24 +23,27 @@ Each switch is compiled separately with its own `SWITCH_ID` and forwarding table
 
 ## Detection behavior
 
-The sender puts a 5-byte collective shim at the beginning of the UDP payload:
+The sender puts a 6-byte collective shim at the beginning of the UDP payload:
 
 | Field | Size |
 | --- | ---: |
-| `context_id` | 2 bytes |
+| `collective_id` | 2 bytes |
 | `flow_id` | 1 byte |
 | `participant_id` | 1 byte |
+| `total_flow_count` | 1 byte |
 | `flags` | 1 byte |
 
-For each hashed `context_id`/`flow_id` pair, a switch stores the minimum and maximum ingress timestamps and the participant IDs associated with those timestamps. It calculates:
+`collective_id` groups all constituent flows in one collective operation; `flow_id` identifies an individual flow within it. Set `total_flow_count` to the number of constituent flows and use the same value on every packet in that collective. For each hashed `collective_id`/`flow_id` pair, a switch stores the minimum and maximum ingress timestamps and the participant IDs associated with those timestamps. It calculates:
+
+For a collective with five flows, all packets use the same `--collective-id 42 --total-flows 5`, while the flows use `--flow 1` through `--flow 5`. A log naming `collective_id=42 flow=4 total_flows=5` identifies flow 4 as the detected lagging flow within that five-flow collective.
 
 ```text
 skew = max_timestamp - min_timestamp
 ```
 
-When `skew > 5000` (the configured 5 ms threshold), it writes a `STRAGGLER` message to that switch's BMv2 log. The report includes the switch ID, context, flow, triggering packet's participant, skew, and the participants associated with the minimum and maximum timestamps. The report is generated in the data plane's log; this version does not send a separate telemetry packet.
+When `skew > 5000` (the configured 5 ms threshold), it writes a `COLLECTIVE_STRAGGLER` message to that switch's BMv2 log. The report includes the switch ID, collective ID, affected flow, declared total flow count, triggering participant, skew, and the participants associated with the minimum and maximum timestamps. `impact=COLLECTIVE_DEGRADED` signals that the collective containing the affected flow is impacted. The report is generated in the data plane's log; this version does not send a separate telemetry packet.
 
-For this experiment, participant 1 is assumed to arrive first and resets the timestamp bounds for that context/flow. Send participant 1 before the other participants. `flags` is carried in the shim but is not currently used by the P4 program.
+For this experiment, participant 1 is assumed to arrive first and resets the timestamp bounds for that collective/flow. Send participant 1 before the other participants. Switches still track and report flows independently: `total_flow_count` is packet-provided context, not an observed count of completed or slow flows. The log identifies a flow with network arrival skew that may delay its parent collective; it does not observe application-level completion or prove that workers are waiting. `flags` is carried in the shim but is not currently used by the P4 program.
 
 ## Build and run
 
@@ -54,9 +57,9 @@ make run
 `make` compiles `straggler.p4` into `build/s1.json` through `build/s4.json`. `make run` starts the Mininet topology using `topology.json`. In the Mininet CLI, send one packet from each participant, in order:
 
 ```text
-h1 python3 sender.py --participant 1 --context 1 --flow 7
-h2 python3 sender.py --participant 2 --context 1 --flow 7
-h3 python3 sender.py --participant 3 --context 1 --flow 7
+h1 python3 sender.py --participant 1 --collective-id 1 --flow 7 --total-flows 1
+h2 python3 sender.py --participant 2 --collective-id 1 --flow 7 --total-flows 1
+h3 python3 sender.py --participant 3 --collective-id 1 --flow 7 --total-flows 1
 ```
 
 The h3 packet should reach s2 roughly 20 ms later than the packets from h1 and h2, exceeding the 5 ms threshold. Watch s2's log from another terminal:
@@ -68,8 +71,24 @@ tail -f logs/s2.log
 A detection should resemble:
 
 ```text
-STRAGGLER switch=2 context=1 flow=7 participant=3 skew_us=... min_participant=1 max_participant=3
+COLLECTIVE_STRAGGLER switch=2 collective_id=1 flow=7 total_flows=1 impact=COLLECTIVE_DEGRADED participant=3 skew_us=... min_participant=1 max_participant=3
 ```
+
+### Two-collective test
+
+Instead of the three sender commands above, run this in the Mininet CLI:
+
+```text
+h1 python3 collective_demo.py --collective-1 100 --collective-2 101 --straggler-delay-ms 50
+```
+
+The script sends five participant packets for each collective on the same flow. Collective 1 is sent as a burst; collective 2's participant 5 is delayed by 50 ms, above the 5 ms detector threshold. Here `total_flows=1` because the five packets are participants on one flow, not five distinct flows. The expected detection names `collective_id=101` and `participant=5`; there should be no new detection for `collective_id=100`. Since the script sends from h1, detections should appear on its path through s1, s4, and s2. In another terminal, inspect them with:
+
+```sh
+grep 'COLLECTIVE_STRAGGLER' logs/s1.log logs/s2.log logs/s4.log
+```
+
+The logs append across runs, so use new collective IDs or clear the logs before repeating the test.
 
 The measured skew varies with runtime scheduling. Use `make stop` to stop and clean up Mininet. To render the topology JSON in the optional viewer, run `python3 topology_viewer.py` from this directory.
 
