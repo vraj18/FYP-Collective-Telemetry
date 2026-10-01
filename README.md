@@ -1,97 +1,67 @@
-# Basic P4 Collective Straggler Detector
+# P4 Collective Flow Straggler Experiment
 
-This experiment detects arrival-time skew between participants in a collective operation. It uses BMv2 switches and reports detections in the switch log.
+This BMv2/Mininet experiment models **one collective** with four or five flows. Each flow contains the same number of UDP packets. Four worker hosts (`h1`-`h4`) send through `s1`; the receiver (`h5`) is connected to `s4`.
+
+The P4 program performs flow-affine ECMP at `s1`: even flow IDs use `s1-s2-s4`, and odd flow IDs use `s1-s3-s4`. The paths have equal hop count. The `s1-s2` link has a configured 30 ms delay to create a controlled network-induced straggler case. This is P4 ECMP, not an NCCL runtime integration.
 
 ## Topology
 
-The checked-in `topology.json` defines four hosts and four P4 switches. All links have bandwidth 100; the h3-to-s2 link has 20 ms delay and the other links have zero configured delay.
+| Link | Delay | Ports |
+| --- | ---: | --- |
+| h1-h4 to s1 | 0 ms | s1 p1-p4 |
+| s1-s2 | 30 ms | s1 p5, s2 p1 |
+| s1-s3 | 0 ms | s1 p6, s3 p1 |
+| s2-s4 | 0 ms | s2 p2, s4 p1 |
+| s3-s4 | 0 ms | s3 p2, s4 p2 |
+| h5-s4 | 0 ms | s4 p3 |
 
-| Link endpoints | Delay |
-| --- | ---: |
-| h1 - s1 port 1 | 0 |
-| h2 - s1 port 2 | 0 |
-| s1 port 3 - s3 port 1 | 0 |
-| s1 port 4 - s4 port 2 | 0 |
-| h3 - s2 port 1 | 20 ms |
-| h4 - s2 port 2 | 0 |
-| s2 port 3 - s4 port 1 | 0 |
-| s2 port 4 - s3 port 2 | 0 |
+All hosts share `10.0.0.0/24`; the senders have a static neighbor entry for h5 so frames arrive with h5's destination MAC. `straggler.p4` is compiled once per switch ID; its fixed egress ports match this topology.
 
-h1, h2, and h3 are collective participants; h4 is the receiver. For traffic to h4, s1 forwards through s4 and then s2. h3 connects directly to s2. As a result, all three participants' packets pass through s2, where their arrival times can be compared. The extra link delay on h3's path makes participant 3 the expected straggler in the example.
+## Detection And Telemetry
 
-Each switch is compiled separately with its own `SWITCH_ID` and forwarding table. Each switch also has independent detection registers.
+The UDP-payload shim contains a collective ID, flow ID, packet index, packets-per-flow count, expected ECMP path, and sender `monotonic_ns` timestamp. It also reserves a packet-header snapshot and four switch-hop records. At s1, P4 copies the observed Ethernet, IPv4, and UDP header fields into the snapshot. Each switch fills its own record with switch ID, ingress port, egress port, and raw ingress timestamp. Telemetry travels inline with the data packet; switches do not emit per-packet logs or send a second telemetry packet.
 
-## Detection behavior
+At h5, `collective_demo.py` writes one JSON object per received packet to `/tmp/collective-telemetry.jsonl`, followed by a collective summary object. Packet records include worker/source and destination addresses, MACs, Ethernet type, IPv4 and UDP fields, flow and sequence numbers, path, per-switch ports and timestamps, and sender/receiver timing. The summary includes packet totals per flow and the straggler classification. P4 sets the UDP checksum to zero after updating telemetry; the record includes the checksum observed at s1 ingress and the transmitted zero checksum.
 
-The sender puts a 6-byte collective shim at the beginning of the UDP payload:
+The receiver waits until all expected packets for every flow arrive. It reports the latest completed flow and the flow with the largest median transit delay. A network-induced straggler is declared when that flow's delay exceeds the median flow delay by more than 10 ms. One `COLLECTIVE_RESULT` line is emitted for the completed collective.
 
-| Field | Size |
-| --- | ---: |
-| `collective_id` | 2 bytes |
-| `flow_id` | 1 byte |
-| `participant_id` | 1 byte |
-| `total_flow_count` | 1 byte |
-| `flags` | 1 byte |
+The traffic generators use equal packet counts and pacing and do not intentionally delay any flow. The 30 ms impairment is configured on a topology link, so the injected difference is in the network path. In a deployment with unsynchronized host clocks, replace the sender timestamp approach with synchronized clocks or switch ingress/egress timestamps.
 
-`collective_id` groups all constituent flows in one collective operation; `flow_id` identifies an individual flow within it. Set `total_flow_count` to the number of constituent flows and use the same value on every packet in that collective. For each hashed `collective_id`/`flow_id` pair, a switch stores the minimum and maximum ingress timestamps and the participant IDs associated with those timestamps. It calculates:
+## Run
 
-For a collective with five flows, all packets use the same `--collective-id 42 --total-flows 5`, while the flows use `--flow 1` through `--flow 5`. A log naming `collective_id=42 flow=4 total_flows=5` identifies flow 4 as the detected lagging flow within that five-flow collective.
-
-```text
-skew = max_timestamp - min_timestamp
-```
-
-When `skew > 5000` (the configured 5 ms threshold), it writes a `COLLECTIVE_STRAGGLER` message to that switch's BMv2 log. The report includes the switch ID, collective ID, affected flow, declared total flow count, triggering participant, skew, and the participants associated with the minimum and maximum timestamps. `impact=COLLECTIVE_DEGRADED` signals that the collective containing the affected flow is impacted. The report is generated in the data plane's log; this version does not send a separate telemetry packet.
-
-For this experiment, participant 1 is assumed to arrive first and resets the timestamp bounds for that collective/flow. Send participant 1 before the other participants. Switches still track and report flows independently: `total_flow_count` is packet-provided context, not an observed count of completed or slow flows. The log identifies a flow with network arrival skew that may delay its parent collective; it does not observe application-level completion or prove that workers are waiting. `flags` is carried in the shim but is not currently used by the P4 program.
-
-## Build and run
-
-Run these commands from this directory:
+From this directory:
 
 ```sh
 make
 make run
 ```
 
-`make` compiles `straggler.p4` into `build/s1.json` through `build/s4.json`. `make run` starts the Mininet topology using `topology.json`. In the Mininet CLI, send one packet from each participant, in order:
+In the Mininet CLI, start the receiver first, then launch the four workers. For five flows, worker 1 sends flows 1 and 5; workers 2-4 send one flow each. The senders interleave their own flows packet-by-packet.
 
 ```text
-h1 python3 sender.py --participant 1 --collective-id 1 --flow 7 --total-flows 1
-h2 python3 sender.py --participant 2 --collective-id 1 --flow 7 --total-flows 1
-h3 python3 sender.py --participant 3 --collective-id 1 --flow 7 --total-flows 1
+h5 python3 collective_demo.py --collective-id 42 --flows 5 --packets 64 &
+h1 python3 sender.py --worker-id 1 --collective-id 42 --flows 5 --packets 64 &
+h2 python3 sender.py --worker-id 2 --collective-id 42 --flows 5 --packets 64 &
+h3 python3 sender.py --worker-id 3 --collective-id 42 --flows 5 --packets 64 &
+h4 python3 sender.py --worker-id 4 --collective-id 42 --flows 5 --packets 64 &
 ```
 
-The h3 packet should reach s2 roughly 20 ms later than the packets from h1 and h2, exceeding the 5 ms threshold. Watch s2's log from another terminal:
-
-```sh
-tail -f logs/s2.log
-```
-
-A detection should resemble:
+The receiver prints one summary similar to:
 
 ```text
-COLLECTIVE_STRAGGLER switch=2 collective_id=1 flow=7 total_flows=1 impact=COLLECTIVE_DEGRADED participant=3 skew_us=... min_participant=1 max_participant=3
+COLLECTIVE_RESULT collective_id=42 flows=5 packets_per_flow=64 latest_flow=4 network_straggler_flow=4 path=s1-s2-s4 network_delay_ms=30.4 delay_over_median_ms=29.9 completion_skew_ms=30.1 classification=NETWORK_INDUCED_STRAGGLER
 ```
 
-### Two-collective test
-
-Instead of the three sender commands above, run this in the Mininet CLI:
+After the collective completes, inspect all packet telemetry and the final totals from the Mininet prompt:
 
 ```text
-h1 python3 collective_demo.py --collective-1 100 --collective-2 101 --straggler-delay-ms 50
+h5 cat /tmp/collective-telemetry.jsonl
 ```
 
-The script sends five participant packets for each collective on the same flow. Collective 1 is sent as a burst; collective 2's participant 5 is delayed by 50 ms, above the 5 ms detector threshold. Here `total_flows=1` because the five packets are participants on one flow, not five distinct flows. The expected detection names `collective_id=101` and `participant=5`; there should be no new detection for `collective_id=100`. Since the script sends from h1, detections should appear on its path through s1, s4, and s2. In another terminal, inspect them with:
+Each line is a separate JSON object. Lines with `"event": "packet"` contain packet/header and per-switch hop data; the final `"event": "collective_result"` line contains per-flow packet counts and the detection result. To choose another file, pass `--telemetry-file /path/to/file.jsonl` to the receiver.
 
-```sh
-grep 'COLLECTIVE_STRAGGLER' logs/s1.log logs/s2.log logs/s4.log
-```
-
-The logs append across runs, so use new collective IDs or clear the logs before repeating the test.
-
-The measured skew varies with runtime scheduling. Use `make stop` to stop and clean up Mininet. To render the topology JSON in the optional viewer, run `python3 topology_viewer.py` from this directory.
+Use `--flows 4` on all five commands for a four-flow run. Set the same collective ID, flow count, and packet count on the receiver and every worker. Change `--threshold-ms` on the receiver to adjust the network-delay threshold. Use `make stop` to stop Mininet. The optional topology viewer is available with `python3 topology_viewer.py`.
 
 ## Scope
 
-This starter implements the core arrival-skew detection loop: operation context, per-switch state, minimum/maximum arrival timestamps, a threshold, and log-based reporting. The configured delay is link-wide, not selectively injected into a particular packet, and detection state is not explicitly expired or cleared except when participant 1 starts the same context/flow again.
+This is a controlled prototype of flow completion and network-path straggler detection. It uses software switches and synthetic UDP collective traffic, not NCCL packets or physical switches. The receiver's send-to-receive latency includes host scheduling and userspace receive overhead as well as network delay; the shared-clock timestamp and identical workload reduce, but do not eliminate, those effects. For production attribution, use synchronized PTP timestamps or in-band switch telemetry and integrate with the collective runtime's flow IDs and completion events.

@@ -4,25 +4,8 @@
       "name" : "scalars_0",
       "id" : 0,
       "fields" : [
-        ["tmp", 16, false],
-        ["tmp_0", 8, false],
-        ["tmp_1", 8, false],
-        ["tmp_2", 16, false],
-        ["tmp_3", 8, false],
-        ["tmp_4", 8, false],
-        ["tmp_5", 8, false],
-        ["tmp_6", 48, false],
-        ["tmp_7", 8, false],
-        ["tmp_8", 8, false],
-        ["index_0", 32, false],
-        ["old_min_0", 48, false],
-        ["old_max_0", 48, false],
-        ["old_min_participant_0", 8, false],
-        ["old_max_participant_0", 8, false],
-        ["metadata_t.min_timestamp", 48, false],
-        ["metadata_t.max_timestamp", 48, false],
-        ["metadata_t.min_participant", 8, false],
-        ["metadata_t.max_participant", 8, false]
+        ["metadata_t.unused", 1, false],
+        ["_padding_0", 7, false]
       ]
     },
     {
@@ -91,9 +74,45 @@
       "fields" : [
         ["collective_id", 16, false],
         ["flow_id", 8, false],
-        ["participant_id", 8, false],
-        ["total_flow_count", 8, false],
-        ["flags", 8, false]
+        ["packet_index", 16, false],
+        ["packets_per_flow", 16, false],
+        ["ecmp_path", 8, false],
+        ["sender_timestamp_ns", 64, false]
+      ]
+    },
+    {
+      "name" : "packet_snapshot_t",
+      "id" : 6,
+      "fields" : [
+        ["eth_dst", 48, false],
+        ["eth_src", 48, false],
+        ["ethertype", 16, false],
+        ["ip_version", 4, false],
+        ["ip_ihl", 4, false],
+        ["ip_diffserv", 8, false],
+        ["ip_total_len", 16, false],
+        ["ip_identification", 16, false],
+        ["ip_flags", 3, false],
+        ["ip_frag_offset", 13, false],
+        ["ip_ttl", 8, false],
+        ["ip_protocol", 8, false],
+        ["ip_checksum", 16, false],
+        ["ip_src", 32, false],
+        ["ip_dst", 32, false],
+        ["udp_src_port", 16, false],
+        ["udp_dst_port", 16, false],
+        ["udp_length", 16, false],
+        ["udp_checksum", 16, false]
+      ]
+    },
+    {
+      "name" : "hop_t",
+      "id" : 7,
+      "fields" : [
+        ["switch_id", 8, false],
+        ["ingress_port", 8, false],
+        ["egress_port", 8, false],
+        ["ingress_timestamp", 64, false]
       ]
     }
   ],
@@ -137,6 +156,41 @@
       "name" : "collective",
       "id" : 5,
       "header_type" : "collective_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "packet_snapshot",
+      "id" : 6,
+      "header_type" : "packet_snapshot_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "hop1",
+      "id" : 7,
+      "header_type" : "hop_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "hop2",
+      "id" : 8,
+      "header_type" : "hop_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "hop3",
+      "id" : 9,
+      "header_type" : "hop_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "hop4",
+      "id" : 10,
+      "header_type" : "hop_t",
       "metadata" : false,
       "pi_omit" : true
     }
@@ -253,6 +307,51 @@
                 }
               ],
               "op" : "extract"
+            },
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "packet_snapshot"
+                }
+              ],
+              "op" : "extract"
+            },
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "hop1"
+                }
+              ],
+              "op" : "extract"
+            },
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "hop2"
+                }
+              ],
+              "op" : "extract"
+            },
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "hop3"
+                }
+              ],
+              "op" : "extract"
+            },
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "hop4"
+                }
+              ],
+              "op" : "extract"
             }
           ],
           "transitions" : [
@@ -275,83 +374,18 @@
       "id" : 0,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 313,
+        "line" : 242,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
-      "order" : ["ethernet", "ipv4", "udp", "collective"],
+      "order" : ["ethernet", "ipv4", "udp", "collective", "packet_snapshot", "hop1", "hop2", "hop3", "hop4"],
       "primitives" : []
     }
   ],
   "meter_arrays" : [],
   "counter_arrays" : [],
-  "register_arrays" : [
-    {
-      "name" : "min_timestamp_reg",
-      "id" : 0,
-      "source_info" : {
-        "filename" : "straggler.p4",
-        "line" : 107,
-        "column" : 25,
-        "source_fragment" : "min_timestamp_reg"
-      },
-      "size" : 65536,
-      "bitwidth" : 48
-    },
-    {
-      "name" : "max_timestamp_reg",
-      "id" : 1,
-      "source_info" : {
-        "filename" : "straggler.p4",
-        "line" : 108,
-        "column" : 25,
-        "source_fragment" : "max_timestamp_reg"
-      },
-      "size" : 65536,
-      "bitwidth" : 48
-    },
-    {
-      "name" : "min_participant_reg",
-      "id" : 2,
-      "source_info" : {
-        "filename" : "straggler.p4",
-        "line" : 109,
-        "column" : 24,
-        "source_fragment" : "min_participant_reg"
-      },
-      "size" : 65536,
-      "bitwidth" : 8
-    },
-    {
-      "name" : "max_participant_reg",
-      "id" : 3,
-      "source_info" : {
-        "filename" : "straggler.p4",
-        "line" : 110,
-        "column" : 24,
-        "source_fragment" : "max_participant_reg"
-      },
-      "size" : 65536,
-      "bitwidth" : 8
-    }
-  ],
-  "calculations" : [
-    {
-      "name" : "calc",
-      "id" : 0,
-      "algo" : "crc16",
-      "input" : [
-        {
-          "type" : "field",
-          "value" : ["scalars", "tmp"]
-        },
-        {
-          "type" : "field",
-          "value" : ["scalars", "tmp_0"]
-        }
-      ]
-    }
-  ],
+  "register_arrays" : [],
+  "calculations" : [],
   "learn_lists" : [],
   "actions" : [
     {
@@ -369,7 +403,7 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 158,
+            "line" : 156,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -377,14 +411,9 @@
       ]
     },
     {
-      "name" : "MyIngress.forward",
+      "name" : "straggler200",
       "id" : 1,
-      "runtime_data" : [
-        {
-          "name" : "port",
-          "bitwidth" : 9
-        }
-      ],
+      "runtime_data" : [],
       "primitives" : [
         {
           "op" : "assign",
@@ -394,237 +423,15 @@
               "value" : ["standard_metadata", "egress_spec"]
             },
             {
-              "type" : "runtime_data",
-              "value" : 0
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 162,
-            "column" : 8,
-            "source_fragment" : "standard_metadata.egress_spec = port"
-          }
-        }
-      ]
-    },
-    {
-      "name" : "MyIngress.detect_straggler",
-      "id" : 2,
-      "runtime_data" : [],
-      "primitives" : [
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp"]
-            },
-            {
-              "type" : "field",
-              "value" : ["collective", "collective_id"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 228,
-            "column" : 12,
-            "source_fragment" : "hdr.collective.collective_id"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["collective", "flow_id"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 229,
-            "column" : 12,
-            "source_fragment" : "hdr.collective.flow_id"
-          }
-        },
-        {
-          "op" : "modify_field_with_hash_based_offset",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            },
-            {
               "type" : "hexstr",
-              "value" : "0x00000000"
-            },
-            {
-              "type" : "calculation",
-              "value" : "calc"
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0x00010000"
+              "value" : "0x0002"
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 227,
-            "column" : 8,
-            "source_fragment" : "hash(index, HashAlgorithm.crc16, (bit<32>) 0, { ..."
-          }
-        },
-        {
-          "op" : "register_read",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_0"]
-            },
-            {
-              "type" : "register_array",
-              "value" : "min_timestamp_reg"
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 233,
-            "column" : 8,
-            "source_fragment" : "min_timestamp_reg.read(old_min, index)"
-          }
-        },
-        {
-          "op" : "register_read",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_max_0"]
-            },
-            {
-              "type" : "register_array",
-              "value" : "max_timestamp_reg"
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 234,
-            "column" : 8,
-            "source_fragment" : "max_timestamp_reg.read(old_max, index)"
-          }
-        },
-        {
-          "op" : "register_read",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_participant_0"]
-            },
-            {
-              "type" : "register_array",
-              "value" : "min_participant_reg"
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 235,
-            "column" : 8,
-            "source_fragment" : "min_participant_reg.read(old_min_participant, index)"
-          }
-        },
-        {
-          "op" : "register_read",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_max_participant_0"]
-            },
-            {
-              "type" : "register_array",
-              "value" : "max_participant_reg"
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 236,
-            "column" : 8,
-            "source_fragment" : "max_participant_reg.read(old_max_participant, index)"
-          }
-        },
-        {
-          "op" : "_jump_if_zero",
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 243,
-            "column" : 8,
-            "source_fragment" : "if"
-          },
-          "parameters" : [
-            {
-              "type" : "expression",
-              "value" : {
-                "type" : "expression",
-                "value" : {
-                  "op" : "b2d",
-                  "left" : null,
-                  "right" : {
-                    "type" : "expression",
-                    "value" : {
-                      "op" : "==",
-                      "left" : {
-                        "type" : "field",
-                        "value" : ["collective", "participant_id"]
-                      },
-                      "right" : {
-                        "type" : "hexstr",
-                        "value" : "0x01"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0xd"
-            }
-          ]
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["standard_metadata", "ingress_global_timestamp"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 244,
+            "line" : 200,
             "column" : 12,
-            "source_fragment" : "old_min = now"
+            "source_fragment" : "standard_metadata.egress_spec = 2"
           }
         },
         {
@@ -632,292 +439,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "old_max_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["standard_metadata", "ingress_global_timestamp"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 245,
-            "column" : 12,
-            "source_fragment" : "old_max = now"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_participant_0"]
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0x01"
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 246,
-            "column" : 12,
-            "source_fragment" : "old_min_participant = 1"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_max_participant_0"]
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0x01"
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 247,
-            "column" : 12,
-            "source_fragment" : "old_max_participant = 1"
-          }
-        },
-        {
-          "op" : "_jump",
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 243,
-            "column" : 8,
-            "source_fragment" : "if"
-          },
-          "parameters" : [
-            {
-              "type" : "hexstr",
-              "value" : "0x1d"
-            }
-          ]
-        },
-        {
-          "op" : "_jump_if_zero",
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 250,
-            "column" : 12,
-            "source_fragment" : "if"
-          },
-          "parameters" : [
-            {
-              "type" : "expression",
-              "value" : {
-                "type" : "expression",
-                "value" : {
-                  "op" : "b2d",
-                  "left" : null,
-                  "right" : {
-                    "type" : "expression",
-                    "value" : {
-                      "op" : "<",
-                      "left" : {
-                        "type" : "field",
-                        "value" : ["standard_metadata", "ingress_global_timestamp"]
-                      },
-                      "right" : {
-                        "type" : "field",
-                        "value" : ["scalars", "old_min_0"]
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0x10"
-            }
-          ]
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["standard_metadata", "ingress_global_timestamp"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 251,
-            "column" : 16,
-            "source_fragment" : "old_min = now"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_participant_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["collective", "participant_id"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 252,
-            "column" : 16,
-            "source_fragment" : "old_min_participant = hdr.collective.participant_id"
-          }
-        },
-        {
-          "op" : "_jump_if_zero",
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 255,
-            "column" : 12,
-            "source_fragment" : "if"
-          },
-          "parameters" : [
-            {
-              "type" : "expression",
-              "value" : {
-                "type" : "expression",
-                "value" : {
-                  "op" : "b2d",
-                  "left" : null,
-                  "right" : {
-                    "type" : "expression",
-                    "value" : {
-                      "op" : ">",
-                      "left" : {
-                        "type" : "field",
-                        "value" : ["standard_metadata", "ingress_global_timestamp"]
-                      },
-                      "right" : {
-                        "type" : "field",
-                        "value" : ["scalars", "old_max_0"]
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0x13"
-            }
-          ]
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_max_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["standard_metadata", "ingress_global_timestamp"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 256,
-            "column" : 16,
-            "source_fragment" : "old_max = now"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_max_participant_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["collective", "participant_id"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 257,
-            "column" : 16,
-            "source_fragment" : "old_max_participant = hdr.collective.participant_id"
-          }
-        },
-        {
-          "op" : "_jump_if_zero",
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 262,
-            "column" : 12,
-            "source_fragment" : "if"
-          },
-          "parameters" : [
-            {
-              "type" : "expression",
-              "value" : {
-                "type" : "expression",
-                "value" : {
-                  "op" : "b2d",
-                  "left" : null,
-                  "right" : {
-                    "type" : "expression",
-                    "value" : {
-                      "op" : ">",
-                      "left" : {
-                        "type" : "expression",
-                        "value" : {
-                          "op" : "&",
-                          "left" : {
-                            "type" : "expression",
-                            "value" : {
-                              "op" : "-",
-                              "left" : {
-                                "type" : "field",
-                                "value" : ["scalars", "old_max_0"]
-                              },
-                              "right" : {
-                                "type" : "field",
-                                "value" : ["scalars", "old_min_0"]
-                              }
-                            }
-                          },
-                          "right" : {
-                            "type" : "hexstr",
-                            "value" : "0xffffffffffff"
-                          }
-                        }
-                      },
-                      "right" : {
-                        "type" : "hexstr",
-                        "value" : "0x000000001388"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0x1d"
-            }
-          ]
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp_1"]
+              "value" : ["hop3", "switch_id"]
             },
             {
               "type" : "hexstr",
@@ -926,9 +448,9 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 39,
-            "column" : 31,
-            "source_fragment" : "3"
+            "line" : 201,
+            "column" : 12,
+            "source_fragment" : "hdr.hop3.switch_id = 3"
           }
         },
         {
@@ -936,83 +458,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "tmp_2"]
-            },
-            {
-              "type" : "field",
-              "value" : ["collective", "collective_id"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 267,
-            "column" : 24,
-            "source_fragment" : "hdr.collective.collective_id"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp_3"]
-            },
-            {
-              "type" : "field",
-              "value" : ["collective", "flow_id"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 268,
-            "column" : 24,
-            "source_fragment" : "hdr.collective.flow_id"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp_4"]
-            },
-            {
-              "type" : "field",
-              "value" : ["collective", "total_flow_count"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 269,
-            "column" : 24,
-            "source_fragment" : "hdr.collective.total_flow_count"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp_5"]
-            },
-            {
-              "type" : "field",
-              "value" : ["collective", "participant_id"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 270,
-            "column" : 24,
-            "source_fragment" : "hdr.collective.participant_id"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp_6"]
+              "value" : ["hop3", "ingress_port"]
             },
             {
               "type" : "expression",
@@ -1023,20 +469,20 @@
                   "left" : {
                     "type" : "expression",
                     "value" : {
-                      "op" : "-",
+                      "op" : "&",
                       "left" : {
                         "type" : "field",
-                        "value" : ["scalars", "old_max_0"]
+                        "value" : ["standard_metadata", "ingress_port"]
                       },
                       "right" : {
-                        "type" : "field",
-                        "value" : ["scalars", "old_min_0"]
+                        "type" : "hexstr",
+                        "value" : "0x00ff"
                       }
                     }
                   },
                   "right" : {
                     "type" : "hexstr",
-                    "value" : "0xffffffffffff"
+                    "value" : "0xff"
                   }
                 }
               }
@@ -1044,9 +490,9 @@
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 271,
-            "column" : 24,
-            "source_fragment" : "skew"
+            "line" : 202,
+            "column" : 12,
+            "source_fragment" : "hdr.hop3.ingress_port = (bit<8>) standard_metadata.ingress_port"
           }
         },
         {
@@ -1054,18 +500,18 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "tmp_7"]
+              "value" : ["hop3", "egress_port"]
             },
             {
-              "type" : "field",
-              "value" : ["scalars", "old_min_participant_0"]
+              "type" : "hexstr",
+              "value" : "0x02"
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 272,
-            "column" : 24,
-            "source_fragment" : "old_min_participant"
+            "line" : 203,
+            "column" : 12,
+            "source_fragment" : "hdr.hop3.egress_port = (bit<8>) standard_metadata.egress_spec"
           }
         },
         {
@@ -1073,162 +519,50 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "tmp_8"]
+              "value" : ["hop3", "ingress_timestamp"]
             },
             {
-              "type" : "field",
-              "value" : ["scalars", "old_max_participant_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 273,
-            "column" : 24,
-            "source_fragment" : "old_max_participant"
-          }
-        },
-        {
-          "op" : "log_msg",
-          "parameters" : [
-            {
-              "type" : "string",
-              "value" : "COLLECTIVE_STRAGGLER switch={} collective_id={} flow={} total_flows={} impact=COLLECTIVE_DEGRADED participant={} skew_us={} min_participant={} max_participant={}"
-            },
-            {
-              "type" : "parameters_vector",
-              "value" : [
-                {
-                  "type" : "field",
-                  "value" : ["scalars", "tmp_1"]
-                },
-                {
-                  "type" : "field",
-                  "value" : ["scalars", "tmp_2"]
-                },
-                {
-                  "type" : "field",
-                  "value" : ["scalars", "tmp_3"]
-                },
-                {
-                  "type" : "field",
-                  "value" : ["scalars", "tmp_4"]
-                },
-                {
-                  "type" : "field",
-                  "value" : ["scalars", "tmp_5"]
-                },
-                {
-                  "type" : "field",
-                  "value" : ["scalars", "tmp_6"]
-                },
-                {
-                  "type" : "field",
-                  "value" : ["scalars", "tmp_7"]
-                },
-                {
-                  "type" : "field",
-                  "value" : ["scalars", "tmp_8"]
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "field",
+                    "value" : ["standard_metadata", "ingress_global_timestamp"]
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0xffffffffffffffff"
+                  }
                 }
-              ]
+              }
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 263,
-            "column" : 16,
-            "source_fragment" : "log_msg( ..."
+            "line" : 204,
+            "column" : 12,
+            "source_fragment" : "hdr.hop3.ingress_timestamp = (bit<64>) standard_metadata.ingress_global_timestamp"
           }
         },
         {
-          "op" : "register_write",
+          "op" : "assign",
           "parameters" : [
             {
-              "type" : "register_array",
-              "value" : "min_timestamp_reg"
+              "type" : "field",
+              "value" : ["udp", "checksum"]
             },
             {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_0"]
+              "type" : "hexstr",
+              "value" : "0x0000"
             }
           ],
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 279,
-            "column" : 8,
-            "source_fragment" : "min_timestamp_reg.write(index, old_min)"
-          }
-        },
-        {
-          "op" : "register_write",
-          "parameters" : [
-            {
-              "type" : "register_array",
-              "value" : "max_timestamp_reg"
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_max_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 280,
-            "column" : 8,
-            "source_fragment" : "max_timestamp_reg.write(index, old_max)"
-          }
-        },
-        {
-          "op" : "register_write",
-          "parameters" : [
-            {
-              "type" : "register_array",
-              "value" : "min_participant_reg"
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_min_participant_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 281,
-            "column" : 8,
-            "source_fragment" : "min_participant_reg.write(index, old_min_participant)"
-          }
-        },
-        {
-          "op" : "register_write",
-          "parameters" : [
-            {
-              "type" : "register_array",
-              "value" : "max_participant_reg"
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "index_0"]
-            },
-            {
-              "type" : "field",
-              "value" : ["scalars", "old_max_participant_0"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 282,
-            "column" : 8,
-            "source_fragment" : "max_participant_reg.write(index, old_max_participant)"
+            "line" : 215,
+            "column" : 12,
+            "source_fragment" : "hdr.udp.checksum = 0"
           }
         }
       ]
@@ -1240,135 +574,20 @@
       "id" : 0,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 152,
+        "line" : 150,
         "column" : 8,
         "source_fragment" : "MyIngress"
       },
-      "init_table" : "MyIngress.ipv4_forward",
+      "init_table" : "node_2",
       "tables" : [
         {
-          "name" : "MyIngress.ipv4_forward",
+          "name" : "tbl_straggler200",
           "id" : 0,
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 171,
-            "column" : 10,
-            "source_fragment" : "ipv4_forward"
-          },
-          "key" : [
-            {
-              "match_type" : "exact",
-              "name" : "hdr.ipv4.dstAddr",
-              "target" : ["ipv4", "dstAddr"],
-              "mask" : null
-            }
-          ],
-          "match_type" : "exact",
-          "type" : "simple",
-          "max_size" : 4,
-          "with_counters" : false,
-          "support_timeout" : false,
-          "direct_meters" : null,
-          "action_ids" : [1, 0],
-          "actions" : ["MyIngress.forward", "MyIngress.drop"],
-          "base_default_next" : "node_3",
-          "next_tables" : {
-            "MyIngress.forward" : "node_3",
-            "MyIngress.drop" : "node_3"
-          },
-          "default_entry" : {
-            "action_id" : 0,
-            "action_const" : false,
-            "action_data" : [],
-            "action_entry_const" : false
-          },
-          "entries" : [
-            {
-              "source_info" : {
-                "filename" : "straggler.p4",
-                "line" : 196,
-                "column" : 12,
-                "source_fragment" : "0x0a000101 : forward(1)"
-              },
-              "match_key" : [
-                {
-                  "match_type" : "exact",
-                  "key" : "0x0a000101"
-                }
-              ],
-              "action_entry" : {
-                "action_id" : 1,
-                "action_data" : ["0x1"]
-              },
-              "priority" : 1
-            },
-            {
-              "source_info" : {
-                "filename" : "straggler.p4",
-                "line" : 197,
-                "column" : 12,
-                "source_fragment" : "0x0a000202 : forward(1)"
-              },
-              "match_key" : [
-                {
-                  "match_type" : "exact",
-                  "key" : "0x0a000202"
-                }
-              ],
-              "action_entry" : {
-                "action_id" : 1,
-                "action_data" : ["0x1"]
-              },
-              "priority" : 2
-            },
-            {
-              "source_info" : {
-                "filename" : "straggler.p4",
-                "line" : 198,
-                "column" : 12,
-                "source_fragment" : "0x0a000303 : forward(2)"
-              },
-              "match_key" : [
-                {
-                  "match_type" : "exact",
-                  "key" : "0x0a000303"
-                }
-              ],
-              "action_entry" : {
-                "action_id" : 1,
-                "action_data" : ["0x2"]
-              },
-              "priority" : 3
-            },
-            {
-              "source_info" : {
-                "filename" : "straggler.p4",
-                "line" : 199,
-                "column" : 12,
-                "source_fragment" : "0x0a000404 : forward(2)"
-              },
-              "match_key" : [
-                {
-                  "match_type" : "exact",
-                  "key" : "0x0a000404"
-                }
-              ],
-              "action_entry" : {
-                "action_id" : 1,
-                "action_data" : ["0x2"]
-              },
-              "priority" : 4
-            }
-          ]
-        },
-        {
-          "name" : "tbl_detect_straggler",
-          "id" : 1,
-          "source_info" : {
-            "filename" : "straggler.p4",
-            "line" : 289,
-            "column" : 12,
-            "source_fragment" : "detect_straggler()"
+            "line" : 200,
+            "column" : 42,
+            "source_fragment" : "= 2; ..."
           },
           "key" : [],
           "match_type" : "exact",
@@ -1377,14 +596,43 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [2],
-          "actions" : ["MyIngress.detect_straggler"],
+          "action_ids" : [1],
+          "actions" : ["straggler200"],
           "base_default_next" : null,
           "next_tables" : {
-            "MyIngress.detect_straggler" : null
+            "straggler200" : null
           },
           "default_entry" : {
-            "action_id" : 2,
+            "action_id" : 1,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_drop",
+          "id" : 1,
+          "source_info" : {
+            "filename" : "straggler.p4",
+            "line" : 218,
+            "column" : 12,
+            "source_fragment" : "drop()"
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [0],
+          "actions" : ["MyIngress.drop"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "MyIngress.drop" : null
+          },
+          "default_entry" : {
+            "action_id" : 0,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -1394,27 +642,81 @@
       "action_profiles" : [],
       "conditionals" : [
         {
-          "name" : "node_3",
+          "name" : "node_2",
           "id" : 0,
           "source_info" : {
             "filename" : "straggler.p4",
-            "line" : 288,
+            "line" : 160,
             "column" : 12,
-            "source_fragment" : "hdr.collective.isValid()"
+            "source_fragment" : "hdr.ipv4.isValid() && hdr.udp.isValid() && ..."
           },
           "expression" : {
             "type" : "expression",
             "value" : {
-              "op" : "d2b",
-              "left" : null,
+              "op" : "and",
+              "left" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "and",
+                  "left" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "and",
+                      "left" : {
+                        "type" : "expression",
+                        "value" : {
+                          "op" : "d2b",
+                          "left" : null,
+                          "right" : {
+                            "type" : "field",
+                            "value" : ["ipv4", "$valid$"]
+                          }
+                        }
+                      },
+                      "right" : {
+                        "type" : "expression",
+                        "value" : {
+                          "op" : "d2b",
+                          "left" : null,
+                          "right" : {
+                            "type" : "field",
+                            "value" : ["udp", "$valid$"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "right" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "d2b",
+                      "left" : null,
+                      "right" : {
+                        "type" : "field",
+                        "value" : ["collective", "$valid$"]
+                      }
+                    }
+                  }
+                }
+              },
               "right" : {
-                "type" : "field",
-                "value" : ["collective", "$valid$"]
+                "type" : "expression",
+                "value" : {
+                  "op" : "==",
+                  "left" : {
+                    "type" : "field",
+                    "value" : ["ipv4", "dstAddr"]
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0x0a000005"
+                  }
+                }
               }
             }
           },
-          "false_next" : null,
-          "true_next" : "tbl_detect_straggler"
+          "true_next" : "tbl_straggler200",
+          "false_next" : "tbl_drop"
         }
       ]
     },
@@ -1423,7 +725,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "straggler.p4",
-        "line" : 294,
+        "line" : 223,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },

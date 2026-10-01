@@ -1,42 +1,15 @@
 #include <core.p4>
 #include <v1model.p4>
 
-/*
- * Basic collective-aware straggler detector.
- *
- * Topology:
- *
- *   h1 --\
- *   h2 --- s1 --- s2 --- h4
- *                 /
- *   h3 -----------/
- *
- * h1, h2, h3 are collective participants.
- * h4 is the receiver. Each switch has its own compiled forwarding
- * configuration and tracks each collective/flow pair independently.
- *
- * Each collective packet carries:
- *   collective_id   : identifies one collective operation
- *   flow_id         : separates constituent flows within a collective
- *   total_flow_count: declared number of flows in the collective
- *   participant_id  : identifies the worker
- *
- * The switch stores the minimum and maximum ingress timestamps
- * for each collective_id/flow_id pair. If max_timestamp - min_timestamp exceeds
- * STRAGGLER_THRESHOLD_US, the latest participant is reported as
- * a straggler in the BMv2 switch log.
- */
+/* Flow-affine ECMP forwarding for one multi-flow collective. */
 
 const bit<16> ETHERTYPE_IPV4 = 0x0800;
 const bit<8>  IP_PROTO_UDP   = 17;
-
-const bit<48> STRAGGLER_THRESHOLD_US = 5000;  // 5 ms
+const bit<32> RECEIVER_IPV4 = 0x0a000005;
 
 #ifndef SWITCH_ID
 #define SWITCH_ID 1
 #endif
-
-const bit<8> LOCAL_SWITCH_ID = SWITCH_ID;
 
 header ethernet_t {
     bit<48> dstAddr;
@@ -66,22 +39,43 @@ header udp_t {
     bit<16> checksum;
 }
 
-/*
- * 6-byte collective context shim at the beginning of UDP payload.
- *
- * Bytes:
- *   0..1 : collective_id
- *   2    : flow_id
- *   3    : participant_id
- *   4    : total_flow_count
- *   5    : flags
- */
+/* Collective context followed by packet-header and four-hop telemetry. */
 header collective_t {
     bit<16> collective_id;
     bit<8>  flow_id;
-    bit<8>  participant_id;
-    bit<8>  total_flow_count;
-    bit<8>  flags;
+    bit<16> packet_index;
+    bit<16> packets_per_flow;
+    bit<8>  ecmp_path;
+    bit<64> sender_timestamp_ns;
+}
+
+header packet_snapshot_t {
+    bit<48> eth_dst;
+    bit<48> eth_src;
+    bit<16> ethertype;
+    bit<4>  ip_version;
+    bit<4>  ip_ihl;
+    bit<8>  ip_diffserv;
+    bit<16> ip_total_len;
+    bit<16> ip_identification;
+    bit<3>  ip_flags;
+    bit<13> ip_frag_offset;
+    bit<8>  ip_ttl;
+    bit<8>  ip_protocol;
+    bit<16> ip_checksum;
+    bit<32> ip_src;
+    bit<32> ip_dst;
+    bit<16> udp_src_port;
+    bit<16> udp_dst_port;
+    bit<16> udp_length;
+    bit<16> udp_checksum;
+}
+
+header hop_t {
+    bit<8> switch_id;
+    bit<8> ingress_port;
+    bit<8> egress_port;
+    bit<64> ingress_timestamp;
 }
 
 struct headers_t {
@@ -89,25 +83,16 @@ struct headers_t {
     ipv4_t      ipv4;
     udp_t       udp;
     collective_t collective;
+    packet_snapshot_t packet_snapshot;
+    hop_t hop1;
+    hop_t hop2;
+    hop_t hop3;
+    hop_t hop4;
 }
 
 struct metadata_t {
-    bit<48> min_timestamp;
-    bit<48> max_timestamp;
-    bit<8>  min_participant;
-    bit<8>  max_participant;
+    bit<1> unused;
 }
-
-/*
- * One register entry per 16-bit CRC hash of collective_id and flow_id.
- *
- * BMv2 registers store one scalar value per entry, so the state is
- * split across several registers rather than one struct register.
- */
-register<bit<48>>(65536) min_timestamp_reg;
-register<bit<48>>(65536) max_timestamp_reg;
-register<bit<8>>(65536)  min_participant_reg;
-register<bit<8>>(65536)  max_participant_reg;
 
 parser MyParser(
     packet_in packet,
@@ -138,6 +123,19 @@ parser MyParser(
 
     state parse_collective {
         packet.extract(hdr.collective);
+        transition parse_packet_snapshot;
+    }
+
+    state parse_packet_snapshot {
+        packet.extract(hdr.packet_snapshot);
+        transition parse_hops;
+    }
+
+    state parse_hops {
+        packet.extract(hdr.hop1);
+        packet.extract(hdr.hop2);
+        packet.extract(hdr.hop3);
+        packet.extract(hdr.hop4);
         transition accept;
     }
 }
@@ -158,135 +156,66 @@ control MyIngress(
         mark_to_drop(standard_metadata);
     }
 
-    action forward(bit<9> port) {
-        standard_metadata.egress_spec = port;
-    }
-
-    /*
-     * h1 -> port 1
-     * h2 -> port 2
-     * h3 -> port 3
-     * h4 -> port 4
-     */
-    table ipv4_forward {
-        key = {
-            hdr.ipv4.dstAddr : exact;
-        }
-
-        actions = {
-            forward;
-            drop;
-        }
-
-        const entries = {
-    #if SWITCH_ID == 1
-            /* s1: host ports 1,2 and upstream links 3,4 */
-            0x0a000101 : forward(1);
-            0x0a000202 : forward(2);
-            0x0a000303 : forward(3);
-            0x0a000404 : forward(4);
-    #elif SWITCH_ID == 2
-            /* s2: local hosts on ports 1,2 and upstream links 3,4 */
-            0x0a000101 : forward(3);
-            0x0a000202 : forward(3);
-            0x0a000303 : forward(1);
-            0x0a000404 : forward(2);
-    #elif SWITCH_ID == 3
-            /* s3: connected to s1 and s2 */
-            0x0a000101 : forward(1);
-            0x0a000202 : forward(1);
-            0x0a000303 : forward(2);
-            0x0a000404 : forward(2);
-    #elif SWITCH_ID == 4
-            /* s4: connected to s1 and s2 */
-            0x0a000101 : forward(2);
-            0x0a000202 : forward(2);
-            0x0a000303 : forward(1);
-            0x0a000404 : forward(1);
-    #else
-            0x0a000101 : forward(1);
-            0x0a000202 : forward(1);
-            0x0a000303 : forward(1);
-            0x0a000404 : forward(1);
-    #endif
-        }
-
-        size = 16;
-        default_action = drop();
-    }
-
-    action detect_straggler() {
-        bit<32> index;
-        bit<48> old_min;
-        bit<48> old_max;
-        bit<8> old_min_participant;
-        bit<8> old_max_participant;
-        bit<48> now;
-        bit<48> skew;
-
-        hash(index, HashAlgorithm.crc16, (bit<32>) 0, {
-            hdr.collective.collective_id,
-            hdr.collective.flow_id
-        }, (bit<32>) 65536);
-        now = standard_metadata.ingress_global_timestamp;
-
-        min_timestamp_reg.read(old_min, index);
-        max_timestamp_reg.read(old_max, index);
-        min_participant_reg.read(old_min_participant, index);
-        max_participant_reg.read(old_max_participant, index);
-
-        /*
-         * For this first experiment, participant 1 starts a new
-         * collective context. The sender deliberately sends
-         * participant 1 first.
-         */
-        if (hdr.collective.participant_id == 1) {
-            old_min = now;
-            old_max = now;
-            old_min_participant = 1;
-            old_max_participant = 1;
+    apply {
+        if (hdr.ipv4.isValid() && hdr.udp.isValid() &&
+            hdr.collective.isValid() && hdr.ipv4.dstAddr == RECEIVER_IPV4) {
+#if SWITCH_ID == 1
+            /* Flow-ID parity is the ECMP hash over the two equal-cost paths. */
+            if (hdr.collective.flow_id[0:0] == 1w0) {
+                standard_metadata.egress_spec = 5;
+            }
+            else {
+                standard_metadata.egress_spec = 6;
+            }
+            hdr.packet_snapshot.eth_dst = hdr.ethernet.dstAddr;
+            hdr.packet_snapshot.eth_src = hdr.ethernet.srcAddr;
+            hdr.packet_snapshot.ethertype = hdr.ethernet.etherType;
+            hdr.packet_snapshot.ip_version = hdr.ipv4.version;
+            hdr.packet_snapshot.ip_ihl = hdr.ipv4.ihl;
+            hdr.packet_snapshot.ip_diffserv = hdr.ipv4.diffserv;
+            hdr.packet_snapshot.ip_total_len = hdr.ipv4.totalLen;
+            hdr.packet_snapshot.ip_identification = hdr.ipv4.identification;
+            hdr.packet_snapshot.ip_flags = hdr.ipv4.flags;
+            hdr.packet_snapshot.ip_frag_offset = hdr.ipv4.fragOffset;
+            hdr.packet_snapshot.ip_ttl = hdr.ipv4.ttl;
+            hdr.packet_snapshot.ip_protocol = hdr.ipv4.protocol;
+            hdr.packet_snapshot.ip_checksum = hdr.ipv4.hdrChecksum;
+            hdr.packet_snapshot.ip_src = hdr.ipv4.srcAddr;
+            hdr.packet_snapshot.ip_dst = hdr.ipv4.dstAddr;
+            hdr.packet_snapshot.udp_src_port = hdr.udp.srcPort;
+            hdr.packet_snapshot.udp_dst_port = hdr.udp.dstPort;
+            hdr.packet_snapshot.udp_length = hdr.udp.length_;
+            hdr.packet_snapshot.udp_checksum = hdr.udp.checksum;
+            hdr.hop1.switch_id = 1;
+            hdr.hop1.ingress_port = (bit<8>) standard_metadata.ingress_port;
+            hdr.hop1.egress_port = (bit<8>) standard_metadata.egress_spec;
+            hdr.hop1.ingress_timestamp = (bit<64>) standard_metadata.ingress_global_timestamp;
+#elif SWITCH_ID == 2
+            standard_metadata.egress_spec = 2;
+            hdr.hop2.switch_id = 2;
+            hdr.hop2.ingress_port = (bit<8>) standard_metadata.ingress_port;
+            hdr.hop2.egress_port = (bit<8>) standard_metadata.egress_spec;
+            hdr.hop2.ingress_timestamp = (bit<64>) standard_metadata.ingress_global_timestamp;
+#elif SWITCH_ID == 3
+            standard_metadata.egress_spec = 2;
+            hdr.hop3.switch_id = 3;
+            hdr.hop3.ingress_port = (bit<8>) standard_metadata.ingress_port;
+            hdr.hop3.egress_port = (bit<8>) standard_metadata.egress_spec;
+            hdr.hop3.ingress_timestamp = (bit<64>) standard_metadata.ingress_global_timestamp;
+#elif SWITCH_ID == 4
+            standard_metadata.egress_spec = 3;
+            hdr.hop4.switch_id = 4;
+            hdr.hop4.ingress_port = (bit<8>) standard_metadata.ingress_port;
+            hdr.hop4.egress_port = (bit<8>) standard_metadata.egress_spec;
+            hdr.hop4.ingress_timestamp = (bit<64>) standard_metadata.ingress_global_timestamp;
+#else
+            drop();
+#endif
+            /* Telemetry modifies the UDP payload; disable its old checksum. */
+            hdr.udp.checksum = 0;
         }
         else {
-            if (now < old_min) {
-                old_min = now;
-                old_min_participant = hdr.collective.participant_id;
-            }
-
-            if (now > old_max) {
-                old_max = now;
-                old_max_participant = hdr.collective.participant_id;
-            }
-
-            skew = old_max - old_min;
-
-            if (skew > STRAGGLER_THRESHOLD_US) {
-                log_msg(
-                    "COLLECTIVE_STRAGGLER switch={} collective_id={} flow={} total_flows={} impact=COLLECTIVE_DEGRADED participant={} skew_us={} min_participant={} max_participant={}",
-                    {
-                        LOCAL_SWITCH_ID,
-                        hdr.collective.collective_id,
-                        hdr.collective.flow_id,
-                        hdr.collective.total_flow_count,
-                        hdr.collective.participant_id,
-                        skew,
-                        old_min_participant,
-                        old_max_participant
-                    }
-                );
-            }
-        }
-
-        min_timestamp_reg.write(index, old_min);
-        max_timestamp_reg.write(index, old_max);
-        min_participant_reg.write(index, old_min_participant);
-        max_participant_reg.write(index, old_max_participant);
-    }
-
-    apply {
-        ipv4_forward.apply();
-
-        if (hdr.collective.isValid()) {
-            detect_straggler();
+            drop();
         }
     }
 }
@@ -319,6 +248,11 @@ control MyDeparser(
         packet.emit(hdr.ipv4);
         packet.emit(hdr.udp);
         packet.emit(hdr.collective);
+        packet.emit(hdr.packet_snapshot);
+        packet.emit(hdr.hop1);
+        packet.emit(hdr.hop2);
+        packet.emit(hdr.hop3);
+        packet.emit(hdr.hop4);
 
         /*
          * Any bytes after the parsed headers are automatically
