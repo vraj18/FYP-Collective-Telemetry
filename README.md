@@ -19,9 +19,43 @@ All hosts share `10.0.0.0/24`; the senders have a static neighbor entry for h5 s
 
 ## Detection And Telemetry
 
-The UDP-payload shim contains a collective ID, flow ID, packet index, packets-per-flow count, expected ECMP path, and sender `monotonic_ns` timestamp. It also reserves a packet-header snapshot and four switch-hop records. At s1, P4 copies the observed Ethernet, IPv4, and UDP header fields into the snapshot. Each switch fills its own record with switch ID, ingress port, egress port, and raw ingress timestamp. Telemetry travels inline with the data packet; switches do not emit per-packet logs or send a second telemetry packet.
+### Packet fields
 
-At h5, `collective_demo.py` writes one JSON object per received packet to `/tmp/collective-telemetry.jsonl`, followed by a collective summary object. Packet records include worker/source and destination addresses, MACs, Ethernet type, IPv4 and UDP fields, flow and sequence numbers, path, per-switch ports and timestamps, and sender/receiver timing. The summary includes packet totals per flow and the straggler classification. P4 sets the UDP checksum to zero after updating telemetry; the record includes the checksum observed at s1 ingress and the transmitted zero checksum.
+The senders create ordinary Ethernet/IPv4/UDP packets to h5 (`10.0.0.5:9999`). Immediately after the UDP header, the UDP payload begins with a fixed-format context shim, followed by telemetry space and the application payload. The P4 parser treats these payload bytes as custom headers so each switch can read and update them.
+
+| Field | Size | Who fills it | Meaning |
+| --- | ---: | --- | --- |
+| Ethernet header | 14 B | Sender | Destination/source MAC addresses and EtherType. |
+| IPv4 header | 20 B | Sender/host stack | Source/destination IP, protocol, length, TTL, and other IPv4 fields. |
+| UDP header | 8 B | Sender/host stack | Source/destination ports, length, and checksum. |
+| Collective ID | 2 B | Sender | Identifies the collective instance. |
+| Flow ID | 1 B | Sender | Identifies a flow within that collective; s1 uses its low bit to select a path. |
+| Packet index | 2 B | Sender | Zero-based packet number within the flow. |
+| Packets per flow | 2 B | Sender | Expected packet count for that flow. |
+| Path ID | 1 B | Sender | Declared expected path: 1 for even flow IDs (`s1-s2-s4`), 2 for odd IDs (`s1-s3-s4`). |
+| Sender timestamp | 8 B | Sender | `time.monotonic_ns()` at send time, used by h5 for end-to-end elapsed time. |
+| Original-header snapshot | 42 B | Initially zero from sender; filled by s1 | Copy of the Ethernet (14 B), IPv4 (20 B), and UDP (8 B) header fields as observed at s1 ingress. |
+| Four hop records | 4 x 11 B | Initially zero from sender; one slot per switch | Each record contains switch ID (1 B), ingress port (1 B), egress port (1 B), and raw ingress timestamp (8 B). |
+| Application payload | Remaining bytes | Sender | The current example appends the literal bytes `collective-flow`. |
+
+The context shim is 16 bytes, the header snapshot is 42 bytes, and the four reserved hop records total 44 bytes. Thus each packet carries 102 bytes of context/snapshot/hop metadata in addition to its Ethernet, IPv4, and UDP headers and application payload. The sender initializes the snapshot and hop records to zero. As the packet traverses the fabric, switches fill their own hop slot; telemetry remains inline in that same data packet.
+
+### What each switch processes
+
+All four switches run the same P4 source, compiled with a different `SWITCH_ID`. The parser extracts Ethernet, then IPv4 for EtherType IPv4, UDP for protocol 17, and then the context shim, snapshot, and four hop records. The ingress logic accepts packets only when the IPv4 and UDP headers and context shim are valid and the IPv4 destination is h5. It uses the switch's compile-time ID to choose its forwarding action and hop-record slot. This prototype uses fixed output-port assignments rather than programmable ECMP tables or load-aware routing.
+
+| Switch | Expected ingress | Forwarding decision | Hop record written |
+| --- | --- | --- | --- |
+| s1 | Host-facing ports 1-4 | Even flow ID -> port 5 to s2; odd flow ID -> port 6 to s3 | Record 1: s1 ID, actual ingress port, selected egress port, ingress timestamp. Also copies the packet's original Ethernet/IPv4/UDP fields into the snapshot. |
+| s2 | Port 1 from s1 | Port 2 to s4 | Record 2: s2 ID, ingress/egress ports, ingress timestamp. |
+| s3 | Port 1 from s1 | Port 2 to s4 | Record 3: s3 ID, ingress/egress ports, ingress timestamp. |
+| s4 | Port 1 from s2 or port 2 from s3 | Port 3 to h5 | Record 4: s4 ID, ingress/egress ports, ingress timestamp. |
+
+The two paths converge at s4. Each switch forwards the packet immediately after setting its output port and writing its telemetry; there is no packet buffering barrier, cross-flow aggregation, or switch-generated report in this program. The switches do not rewrite the original Ethernet/IP addresses or decrement TTL in this P4 logic. Since the telemetry changes the UDP payload, P4 sets the UDP checksum to zero; the snapshot preserves the UDP checksum observed at s1 ingress.
+
+### Receiver-side detection and logs
+
+At h5, `collective_demo.py` writes one JSON object per received packet to `/tmp/collective-telemetry.jsonl`, followed by a collective summary object. Packet records include worker/source and destination addresses, MACs, Ethernet type, IPv4 and UDP fields, flow and sequence numbers, path, per-switch ports and timestamps, and sender/receiver timing. The summary includes packet totals per flow and the straggler classification.
 
 The receiver waits until all expected packets for every flow arrive. It reports the latest completed flow and the flow with the largest median transit delay. A network-induced straggler is declared when that flow's delay exceeds the median flow delay by more than 10 ms. One `COLLECTIVE_RESULT` line is emitted for the completed collective.
 

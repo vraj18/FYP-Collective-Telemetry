@@ -28324,3 +28324,41 @@ Adding interface s1-eth6 as port 6
 [15:34:23.474] [bmv2] [D] [thread 8801] [512.0] [cxt 0] Pipeline 'ingress': end
 [15:34:23.474] [bmv2] [D] [thread 8801] [512.0] [cxt 0] Egress port is 511
 [15:34:23.474] [bmv2] [D] [thread 8801] [512.0] [cxt 0] Dropping packet at the end of ingress
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Processing packet received on port 1
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Parser 'parser': start
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Parser 'parser' entering state 'start'
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Extracting header 'ethernet'
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Parser state 'start': key is 86dd
+[15:34:31.636] [bmv2] [T] [thread 8801] [513.0] [cxt 0] Bytes parsed: 14
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Parser 'parser': end
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Pipeline 'ingress': start
+[15:34:31.636] [bmv2] [T] [thread 8801] [513.0] [cxt 0] straggler.p4(160) Condition "hdr.ipv4.isValid() && hdr.udp.isValid() && ..." (node_2) is false
+[15:34:31.636] [bmv2] [T] [thread 8801] [513.0] [cxt 0] Applying table 'tbl_drop'
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Looking up key:
+
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Table 'tbl_drop': miss
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Action entry is MyIngress.drop - 
+[15:34:31.636] [bmv2] [T] [thread 8801] [513.0] [cxt 0] Action MyIngress.drop
+[15:34:31.636] [bmv2] [T] [thread 8801] [513.0] [cxt 0] straggler.p4(156) Primitive mark_to_drop(standard_metadata)
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Pipeline 'ingress': end
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Egress port is 511
+[15:34:31.636] [bmv2] [D] [thread 8801] [513.0] [cxt 0] Dropping packet at the end of ingress
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Processing packet received on port 4
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Parser 'parser': start
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Parser 'parser' entering state 'start'
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Extracting header 'ethernet'
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Parser state 'start': key is 86dd
+[15:34:35.733] [bmv2] [T] [thread 8801] [514.0] [cxt 0] Bytes parsed: 14
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Parser 'parser': end
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Pipeline 'ingress': start
+[15:34:35.733] [bmv2] [T] [thread 8801] [514.0] [cxt 0] straggler.p4(160) Condition "hdr.ipv4.isValid() && hdr.udp.isValid() && ..." (node_2) is false
+[15:34:35.733] [bmv2] [T] [thread 8801] [514.0] [cxt 0] Applying table 'tbl_drop'
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Looking up key:
+
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Table 'tbl_drop': miss
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Action entry is MyIngress.drop - 
+[15:34:35.733] [bmv2] [T] [thread 8801] [514.0] [cxt 0] Action MyIngress.drop
+[15:34:35.733] [bmv2] [T] [thread 8801] [514.0] [cxt 0] straggler.p4(156) Primitive mark_to_drop(standard_metadata)
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Pipeline 'ingress': end
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Egress port is 511
+[15:34:35.733] [bmv2] [D] [thread 8801] [514.0] [cxt 0] Dropping packet at the end of ingress
