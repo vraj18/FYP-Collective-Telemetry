@@ -99,3 +99,20 @@ Use `--flows 4` on all five commands for a four-flow run. Set the same collectiv
 ## Scope
 
 This is a controlled prototype of flow completion and network-path straggler detection. It uses software switches and synthetic UDP collective traffic, not NCCL packets or physical switches. The receiver's send-to-receive latency includes host scheduling and userspace receive overhead as well as network delay; the shared-clock timestamp and identical workload reduce, but do not eliminate, those effects. For production attribution, use synchronized PTP timestamps or in-band switch telemetry and integrate with the collective runtime's flow IDs and completion events.
+
+
+
+### HOW TO RUN: 
+cd /home/p4/Downloads/Collective-Telemetry-P4-main/p4-straggler-basic
+make
+make run
+
+# in Mininet:
+h5 python3 collective_demo.py --collective-id 42 --flows 5 --packets 64 &
+h1 python3 sender.py --worker-id 1 --collective-id 42 --flows 5 --packets 64 &
+h2 python3 sender.py --worker-id 2 --collective-id 42 --flows 5 --packets 64 &
+h3 python3 sender.py --worker-id 3 --collective-id 42 --flows 5 --packets 64 &
+h4 python3 sender.py --worker-id 4 --collective-id 42 --flows 5 --packets 64 &
+
+# on h5:
+cat /tmp/collective-telemetry.jsonl

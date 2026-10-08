@@ -38,6 +38,11 @@ def main():
     parser.add_argument("--dst", default="10.0.0.5")
     parser.add_argument("--port", type=int, default=9999)
     parser.add_argument("--telemetry-file", default="/tmp/collective-telemetry.jsonl")
+    parser.add_argument(
+        "--packet-logs",
+        action="store_true",
+        help="Write one JSON line per packet in addition to the switch summaries.",
+    )
     args = parser.parse_args()
 
     if not 1 <= args.collective_id <= 65535:
@@ -48,6 +53,7 @@ def main():
         parser.error("threshold must be nonnegative and timeout must be positive")
 
     received = {flow_id: {} for flow_id in range(1, args.flows + 1)}
+    switch_samples = {}
     deadline = time.monotonic() + args.timeout_s
     minimum_length = SHIM.size + PACKET_SNAPSHOT.size + 4 * HOP_RECORD.size
     telemetry_path = Path(args.telemetry_file)
@@ -165,7 +171,17 @@ def main():
                 "receiver_timestamp_monotonic_ns": received_ns,
                 "estimated_transit_ns": received_ns - sent_ns,
             }
-            write_json_line(telemetry, record)
+            if args.packet_logs:
+                write_json_line(telemetry, record)
+
+            for hop in hops:
+                switch_name = hop["switch_id"]
+                if not switch_name:
+                    continue
+                switch_id = int(switch_name[1:])
+                switch_samples.setdefault(switch_id, []).append(
+                    hop["ingress_timestamp_raw"] - sent_ns
+                )
 
             packets = received[flow_id]
             if packet_index not in packets:
@@ -217,6 +233,29 @@ def main():
                 hop["switch_id"] for hop in next(iter(packets.values()))["hops"]
             ],
         }
+
+    with telemetry_path.open("a", encoding="utf-8") as telemetry:
+        switch_summary = []
+        for switch_id in sorted(switch_samples):
+            values = sorted(switch_samples[switch_id])
+            switch_summary.append(
+                {
+                    "switch_id": f"s{switch_id}",
+                    "sample_count": len(values),
+                    "avg_arrival_ns": statistics.mean(values),
+                    "median_arrival_ns": statistics.median(values),
+                    "min_arrival_ns": values[0],
+                    "max_arrival_ns": values[-1],
+                }
+            )
+        write_json_line(
+            telemetry,
+            {
+                "event": "switch_summary",
+                "switches": switch_summary,
+                "aggregate_window_packets": sum(len(v) for v in switch_samples.values()),
+            },
+        )
 
     network_straggler = max(flow_stats, key=lambda flow: flow_stats[flow]["network_delay_ns"])
     latest_flow = max(flow_stats, key=lambda flow: flow_stats[flow]["completion_ns"])
