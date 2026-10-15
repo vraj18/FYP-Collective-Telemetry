@@ -25,6 +25,7 @@ def main():
     parser.add_argument("--inter-packet-ms", type=float, default=1.0)
     parser.add_argument("--dst", default="10.0.0.5")
     parser.add_argument("--port", type=int, default=9999)
+    parser.add_argument("--payload-bytes", type=int, default=15)
     args = parser.parse_args()
 
     if not 1 <= args.collective_id <= 65535:
@@ -72,7 +73,7 @@ def main():
                 )
                 empty_hops = HOP_RECORD.pack(0, 0, 0, 0) * 4
                 sock.sendto(
-                    shim + empty_snapshot + empty_hops + b"collective-flow",
+                    shim + empty_snapshot + empty_hops + b"x" * args.payload_bytes,
                     (args.dst, args.port),
                 )
             if args.inter_packet_ms and packet_index + 1 < args.packets:

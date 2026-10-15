@@ -189,7 +189,7 @@ def main():
                     "received_ns": received_ns,
                     "sent_ns": sent_ns,
                     "path_id": path_id,
-                    "hops": hops,
+                    "hops": hops if not packets else [],
                 }
 
             if all(len(packets) == args.packets for packets in received.values()):
